@@ -1,4 +1,4 @@
-# cleansource-cli
+# cleansource-sca-cli
 
 CleanSource SCA CLI
 
