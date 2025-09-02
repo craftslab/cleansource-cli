@@ -100,9 +100,7 @@ jobs:
     - name: Move artifacts to release directory
       run: |
         mkdir -p release
-        find artifacts -name "*.zip" -o -name "*.tar.gz" | while read file; do
-          cp "$file" release/
-        done
+        find artifacts -type f \( -name "*.zip" -o -name "*.tar.gz" \) -exec cp {} release/ \;
     - name: Generate checksums
       run: |
         cd release
