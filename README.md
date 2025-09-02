@@ -1,4 +1,4 @@
-# Build Scan Go
+# CleanSource SCA Build Scanner
 
 A Go implementation of the CleanSource SCA build scanner.
 
