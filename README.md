@@ -1,4 +1,4 @@
-# CleanSource SCA Build Scanner
+# CleanSource SCA CLI
 
 A Go implementation of the CleanSource SCA build scanner.
 
