@@ -1,0 +1,121 @@
+name: Release
+
+on:
+  release:
+    types:
+      - created
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [windows, linux, darwin]
+        goarch: [amd64, arm64]
+        exclude:
+          - goos: windows
+            goarch: arm64
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+    - name: Get version
+      id: version
+      run: |
+        if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+        else
+          echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        fi
+    - name: Set binary name
+      id: binary
+      run: |
+        BINARY_NAME="cleansource-sca-cli"
+        if [ "${{ matrix.goos }}" == "windows" ]; then
+          BINARY_NAME="${BINARY_NAME}.exe"
+        fi
+        echo "BINARY_NAME=${BINARY_NAME}" >> $GITHUB_OUTPUT
+        # Set archive name
+        ARCHIVE_NAME="cleansource-sca-cli-${{ steps.version.outputs.VERSION }}-${{ matrix.goos }}-${{ matrix.goarch }}"
+        if [ "${{ matrix.goos }}" == "windows" ]; then
+          ARCHIVE_NAME="${ARCHIVE_NAME}.zip"
+        else
+          ARCHIVE_NAME="${ARCHIVE_NAME}.tar.gz"
+        fi
+        echo "ARCHIVE_NAME=${ARCHIVE_NAME}" >> $GITHUB_OUTPUT
+    - name: Build binary
+      env:
+        GOOS: ${{ matrix.goos }}
+        GOARCH: ${{ matrix.goarch }}
+        CGO_ENABLED: 0
+      run: |
+        BUILD_TIME=$(date +%Y-%m-%d_%H:%M:%S)
+        GIT_COMMIT=$(git rev-parse --short HEAD)
+        VERSION=${{ steps.version.outputs.VERSION }}
+        LDFLAGS="-s -w -X main.Version=${VERSION} -X main.BuildTime=${BUILD_TIME} -X main.GitCommit=${GIT_COMMIT}"
+        mkdir -p build
+        go build -ldflags="${LDFLAGS}" -o "build/${{ steps.binary.outputs.BINARY_NAME }}" main.go
+    - name: Create archive
+      run: |
+        cd build
+        if [ "${{ matrix.goos }}" == "windows" ]; then
+          zip "../${{ steps.binary.outputs.ARCHIVE_NAME }}" "${{ steps.binary.outputs.BINARY_NAME }}"
+        else
+          tar -czf "../${{ steps.binary.outputs.ARCHIVE_NAME }}" "${{ steps.binary.outputs.BINARY_NAME }}"
+        fi
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ steps.binary.outputs.ARCHIVE_NAME }}
+        path: ${{ steps.binary.outputs.ARCHIVE_NAME }}
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    - name: Get version
+      id: version
+      run: |
+        if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+        else
+          echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        fi
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+    - name: Move artifacts to release directory
+      run: |
+        mkdir -p release
+        find artifacts -name "*.zip" -o -name "*.tar.gz" | while read file; do
+          cp "$file" release/
+        done
+    - name: Generate checksums
+      run: |
+        cd release
+        sha256sum * > checksums.txt
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.version.outputs.VERSION }}
+        name: Release ${{ steps.version.outputs.VERSION }}
+        body_path: release_notes.md
+        files: |
+          release/*
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.CRAFTSLAB_TOKEN }}
