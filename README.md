@@ -1,5 +1,11 @@
 # CleanSource SCA CLI
 
+English | [中文](./README_cn.md)
+
+[![Go Report Card](https://goreportcard.com/badge/github.com/craftslab/cleansource-sca-cli)](https://goreportcard.com/report/github.com/craftslab/cleansource-sca-cli)
+[![License](https://img.shields.io/github/license/craftslab/cleansource-sca-cli.svg)](https://github.com/craftslab/cleansource-sca-cli/blob/main/LICENSE)
+[![Tag](https://img.shields.io/github/tag/craftslab/cleansource-sca-cli.svg)](https://github.com/craftslab/cleansource-sca-cli/tags)
+
 A Go implementation of the CleanSource SCA build scanner.
 
 ## Overview
