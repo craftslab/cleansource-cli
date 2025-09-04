@@ -57,6 +57,11 @@ Linux 平台:
 GOOS=linux GOARCH=amd64 go build -o cleansource-sca-cli main.go
 ```
 
+macOS 平台:
+```bash
+GOOS=darwin GOARCH=amd64 go build -o cleansource-sca-cli main.go
+```
+
 ## 使用方法
 
 ### 基本用法

@@ -57,6 +57,11 @@ For Linux:
 GOOS=linux GOARCH=amd64 go build -o cleansource-sca-cli main.go
 ```
 
+For macOS:
+```bash
+GOOS=darwin GOARCH=amd64 go build -o cleansource-sca-cli main.go
+```
+
 ## Usage
 
 ### Basic Usage
