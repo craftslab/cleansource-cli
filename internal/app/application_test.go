@@ -206,7 +206,7 @@ func TestBuildScanApplication_runDockerScan_NotImplemented(t *testing.T) {
 		t.Error("runDockerScan should return error as it's not implemented")
 	}
 
-	if err.Error() != "Docker scan not yet implemented" {
+	if err.Error() != "docker scan not yet implemented" {
 		t.Errorf("Expected specific error message, got: %s", err.Error())
 	}
 }
@@ -227,7 +227,7 @@ func TestBuildScanApplication_runBinaryScan_NotImplemented(t *testing.T) {
 		t.Error("runBinaryScan should return error as it's not implemented")
 	}
 
-	if err.Error() != "Binary scan not yet implemented" {
+	if err.Error() != "binary scan not yet implemented" {
 		t.Errorf("Expected specific error message, got: %s", err.Error())
 	}
 }

@@ -33,6 +33,16 @@ func NewWfpScanner(cfg *config.ScanConfig) *WfpScanner {
 func (w *WfpScanner) GenerateWfpFile(scanDir string) (string, error) {
 	w.log.Info("Starting fingerprint generation...")
 
+	// Ensure scan directory exists
+	if info, err := os.Stat(scanDir); err != nil || !info.IsDir() {
+		return "", fmt.Errorf("scan directory not found: %s", scanDir)
+	}
+
+	// If TaskDir not set (tests often leave empty), use scanDir for relative path calculation
+	if w.config.TaskDir == "" {
+		w.config.TaskDir = scanDir
+	}
+
 	wfpFile := filepath.Join(w.config.ToPath, "fingerprints.wfp")
 	file, err := os.Create(wfpFile)
 	if err != nil {
@@ -45,9 +55,12 @@ func (w *WfpScanner) GenerateWfpFile(scanDir string) (string, error) {
 	var wg sync.WaitGroup
 	fingerprintChan := make(chan string, 100)
 	errorChan := make(chan error, 10)
+	var writerWG sync.WaitGroup
 
-	// Start writer goroutine
+	// Start writer goroutine and ensure it completes before returning
+	writerWG.Add(1)
 	go func() {
+		defer writerWG.Done()
 		for fingerprint := range fingerprintChan {
 			if _, err := file.WriteString(fingerprint + "\n"); err != nil {
 				errorChan <- err
@@ -60,6 +73,11 @@ func (w *WfpScanner) GenerateWfpFile(scanDir string) (string, error) {
 	err = filepath.Walk(scanDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil // Continue walking
+		}
+
+		// Skip the output file itself to avoid self-fingerprinting / races
+		if path == wfpFile {
+			return nil
 		}
 
 		if info.IsDir() || w.shouldSkipFile(path, info) {
@@ -88,7 +106,10 @@ func (w *WfpScanner) GenerateWfpFile(scanDir string) (string, error) {
 	wg.Wait()
 	close(fingerprintChan)
 
-	// Check for errors
+	// Wait for writer to finish to ensure all data flushed
+	writerWG.Wait()
+
+	// Check for errors (non-blocking)
 	select {
 	case err := <-errorChan:
 		return "", fmt.Errorf("error writing fingerprints: %w", err)
