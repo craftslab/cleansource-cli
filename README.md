@@ -6,7 +6,7 @@ English | [中文](./README_cn.md)
 [![License](https://img.shields.io/github/license/craftslab/cleansource-sca-cli.svg)](https://github.com/craftslab/cleansource-sca-cli/blob/main/LICENSE)
 [![Tag](https://img.shields.io/github/tag/craftslab/cleansource-sca-cli.svg)](https://github.com/craftslab/cleansource-sca-cli/tags)
 
-A Go implementation of the CleanSource SCA build scanner.
+A Go implementation of the CleanSource SCA build scanner with comprehensive support for multiple build tools and extensive test coverage.
 
 ## Overview
 
@@ -21,13 +21,15 @@ A Go implementation of the CleanSource SCA build scanner.
 - ✅ Source code fingerprinting (WFP generation)
 - ✅ Maven dependency scanning
 - ✅ Python pip dependency scanning
+- ✅ Gradle dependency scanning
+- ✅ npm/Node.js dependency scanning
+- ✅ Go modules dependency scanning
+- ✅ Pipenv dependency scanning
 - ✅ File compression and archiving
 - ✅ REST API client for server communication
 - ✅ Concurrent processing for large codebases
-- 🚧 Gradle dependency scanning (in progress)
-- 🚧 npm/Node.js dependency scanning (in progress)
-- 🚧 Go modules dependency scanning (in progress)
-- 🚧 Pipenv dependency scanning (in progress)
+- ✅ Comprehensive test coverage
+- ✅ Cross-platform support
 
 ## Installation
 
@@ -127,19 +129,96 @@ GOOS=darwin GOARCH=amd64 go build -o cleansource-sca-cli main.go
 
 | Build Tool | Status | Description |
 |------------|--------|-------------|
-| Maven | ✅ Complete | Full dependency tree analysis |
-| pip | ✅ Complete | Requirements.txt and installed packages |
-| Gradle | 🚧 Partial | Basic detection, scanning in progress |
-| npm | 🚧 Partial | Basic detection, scanning in progress |
-| Go Modules | 🚧 Partial | Basic detection, scanning in progress |
-| Pipenv | 🚧 Partial | Basic detection, scanning in progress |
+| Maven | ✅ Complete | Full dependency tree analysis with POM parsing |
+| pip | ✅ Complete | Requirements.txt and installed packages analysis |
+| Gradle | ✅ Complete | Build.gradle parsing with dependency extraction |
+| npm | ✅ Complete | Package.json parsing with all dependency types |
+| Go Modules | ✅ Complete | go.mod parsing with module dependency analysis |
+| Pipenv | ✅ Complete | Pipfile parsing with pipenv dependency resolution |
+
+### Build Tool Detection
+
+The CLI automatically detects build tools based on the presence of characteristic files:
+
+- **Maven**: `pom.xml`
+- **Gradle**: `build.gradle`, `build.gradle.kts`
+- **npm**: `package.json`
+- **Go Modules**: `go.mod`
+- **Pipenv**: `Pipfile`, `Pipfile.lock`
+- **pip**: `requirements.txt`, `setup.py`, `pyproject.toml`
 
 ## Development
 
 ### Running Tests
 
+The project includes comprehensive test coverage for all scanner implementations:
+
 ```bash
+# Run all tests
 go test ./...
+
+# Run tests with verbose output
+go test -v ./...
+
+# Run specific package tests
+go test -v ./pkg/buildtools/...
+
+# Run integration tests
+go test -v -run "TestScannerIntegration" .
+
+# Run benchmarks
+go test -bench=. -benchmem ./...
+
+# Generate coverage report
+go test -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out -o coverage.html
+```
+
+#### Test Scripts
+
+**Linux/macOS:**
+```bash
+./run-tests.sh
+```
+
+**Windows:**
+```cmd
+run-tests.bat
+```
+
+**Advanced Options:**
+```bash
+# Linux/macOS - Run only unit tests (skip integration tests)
+./run-tests.sh --unit-only
+
+# Linux/macOS - Enable verbose output
+./run-tests.sh --verbose
+
+# Linux/macOS - Set custom coverage threshold
+./run-tests.sh --coverage-threshold 80
+
+# Linux/macOS - Skip cleanup of test artifacts
+./run-tests.sh --no-cleanup
+
+# Linux/macOS - Show help
+./run-tests.sh --help
+```
+
+```cmd
+REM Windows - Run only unit tests (skip integration tests)
+run-tests.bat --unit-only
+
+REM Windows - Enable verbose output
+run-tests.bat --verbose
+
+REM Windows - Set custom coverage threshold
+run-tests.bat --coverage-threshold 80
+
+REM Windows - Skip cleanup of test artifacts
+run-tests.bat --no-cleanup
+
+REM Windows - Show help
+run-tests.bat --help
 ```
 
 ### Building
@@ -150,7 +229,44 @@ go build -o cleansource-sca-cli main.go
 
 # Build with optimizations
 go build -ldflags="-s -w" -o cleansource-sca-cli main.go
+
+# Cross-compilation examples
+GOOS=windows GOARCH=amd64 go build -o cleansource-sca-cli.exe main.go
+GOOS=linux GOARCH=amd64 go build -o cleansource-sca-cli main.go
+GOOS=darwin GOARCH=amd64 go build -o cleansource-sca-cli main.go
 ```
+
+## Scanner Implementations
+
+### Go Modules Scanner
+- **Detection**: `go.mod` files
+- **Features**: Module name/version extraction, dependency analysis via `go list`
+- **Dependencies**: Requires Go 1.11+ with modules support
+
+### NPM Scanner
+- **Detection**: `package.json` files
+- **Features**: Project info extraction, dependency parsing (runtime, dev, peer)
+- **Dependencies**: Optional npm executable for enhanced functionality
+
+### Gradle Scanner
+- **Detection**: `build.gradle`, `build.gradle.kts` files
+- **Features**: Project info extraction, dependency parsing with scope detection
+- **Dependencies**: Optional Gradle executable or wrapper
+
+### Pipenv Scanner
+- **Detection**: `Pipfile`, `Pipfile.lock` files
+- **Features**: Project info extraction, dependency resolution via `pipenv run pip freeze`
+- **Dependencies**: Requires pipenv and Python environment
+
+### Maven Scanner
+- **Detection**: `pom.xml` files
+- **Features**: POM parsing, dependency tree analysis
+- **Dependencies**: Optional Maven executable for enhanced functionality
+
+### Pip Scanner
+- **Detection**: `requirements.txt`, `setup.py`, `pyproject.toml` files
+- **Features**: Requirements parsing, installed package analysis
+- **Dependencies**: Optional pip executable
 
 ### Adding New Build Tools
 
@@ -162,12 +278,76 @@ To add support for a new build tool:
    - `FileFind()`: Check for required files
    - `ScanExecute()`: Execute the dependency scan
 3. Add detection logic in `pkg/buildtools/scanner.go`
-4. Test with sample projects
+4. Add comprehensive tests in `pkg/buildtools/scanners_test.go`
+5. Update model tests in `internal/model/types_test.go`
+6. Test with sample projects
+
+## Examples
+
+### Multi-Project Scanning
+
+The CLI can scan projects with multiple build tools:
+
+```bash
+# Scan a project with Go modules and npm
+./cleansource-sca-cli --server-url https://your-server.com \
+    --token your-token \
+    --task-dir /path/to/multi-language-project
+```
+
+### Project Structure Examples
+
+**Go Project:**
+```
+project/
+├── go.mod
+├── main.go
+└── go.sum
+```
+
+**Node.js Project:**
+```
+project/
+├── package.json
+├── package-lock.json
+└── src/
+```
+
+**Gradle Project:**
+```
+project/
+├── build.gradle
+├── settings.gradle
+└── src/
+```
+
+**Python Pipenv Project:**
+```
+project/
+├── Pipfile
+├── Pipfile.lock
+└── src/
+```
 
 ## Contributing
 
 1. Fork the repository
-2. Create a feature branch
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
 3. Make your changes
-4. Add tests
-5. Submit a pull request
+4. Add comprehensive tests for new functionality
+5. Ensure all tests pass (`go test ./...`)
+6. Run the test scripts (`./run-tests.sh` or `run-tests.bat`)
+7. Update documentation if needed
+8. Commit your changes (`git commit -m 'Add amazing feature'`)
+9. Push to the branch (`git push origin feature/amazing-feature`)
+10. Open a Pull Request
+
+### Development Guidelines
+
+- Follow Go coding standards and best practices
+- Add tests for all new functionality
+- Update documentation for new features
+- Ensure cross-platform compatibility
+- Use meaningful commit messages
+- Keep the codebase clean and well-documented
+

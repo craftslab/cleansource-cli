@@ -6,7 +6,7 @@
 [![License](https://img.shields.io/github/license/craftslab/cleansource-sca-cli.svg)](https://github.com/craftslab/cleansource-sca-cli/blob/main/LICENSE)
 [![Tag](https://img.shields.io/github/tag/craftslab/cleansource-sca-cli.svg)](https://github.com/craftslab/cleansource-sca-cli/tags)
 
-A Go implementation of the CleanSource SCA build scanner.
+一个 Go 实现的 CleanSource SCA 构建扫描器，具有全面的多构建工具支持和广泛的测试覆盖。
 
 ## 概述
 
@@ -21,13 +21,15 @@ A Go implementation of the CleanSource SCA build scanner.
 - ✅ 源代码指纹识别 (WFP 生成)
 - ✅ Maven 依赖扫描
 - ✅ Python pip 依赖扫描
+- ✅ Gradle 依赖扫描
+- ✅ npm/Node.js 依赖扫描
+- ✅ Go 模块依赖扫描
+- ✅ Pipenv 依赖扫描
 - ✅ 文件压缩和归档
 - ✅ REST API 客户端用于服务器通信
 - ✅ 大型代码库并发处理
-- 🚧 Gradle 依赖扫描 (开发中)
-- 🚧 npm/Node.js 依赖扫描 (开发中)
-- 🚧 Go 模块依赖扫描 (开发中)
-- 🚧 Pipenv 依赖扫描 (开发中)
+- ✅ 全面的测试覆盖
+- ✅ 跨平台支持
 
 ## 安装
 
@@ -127,19 +129,96 @@ GOOS=darwin GOARCH=amd64 go build -o cleansource-sca-cli main.go
 
 | 构建工具 | 状态 | 描述 |
 |------------|--------|-------------|
-| Maven | ✅ 完成 | 完整的依赖树分析 |
-| pip | ✅ 完成 | Requirements.txt 和已安装包 |
-| Gradle | 🚧 部分 | 基本检测，扫描开发中 |
-| npm | 🚧 部分 | 基本检测，扫描开发中 |
-| Go Modules | 🚧 部分 | 基本检测，扫描开发中 |
-| Pipenv | 🚧 部分 | 基本检测，扫描开发中 |
+| Maven | ✅ 完成 | 完整的依赖树分析，支持 POM 解析 |
+| pip | ✅ 完成 | Requirements.txt 和已安装包分析 |
+| Gradle | ✅ 完成 | Build.gradle 解析，支持依赖提取 |
+| npm | ✅ 完成 | Package.json 解析，支持所有依赖类型 |
+| Go Modules | ✅ 完成 | go.mod 解析，支持模块依赖分析 |
+| Pipenv | ✅ 完成 | Pipfile 解析，支持 pipenv 依赖解析 |
+
+### 构建工具检测
+
+CLI 基于特征文件的存在自动检测构建工具：
+
+- **Maven**: `pom.xml`
+- **Gradle**: `build.gradle`, `build.gradle.kts`
+- **npm**: `package.json`
+- **Go Modules**: `go.mod`
+- **Pipenv**: `Pipfile`, `Pipfile.lock`
+- **pip**: `requirements.txt`, `setup.py`, `pyproject.toml`
 
 ## 开发
 
 ### 运行测试
 
+项目包含所有扫描器实现的全面测试覆盖：
+
 ```bash
+# 运行所有测试
 go test ./...
+
+# 运行详细输出测试
+go test -v ./...
+
+# 运行特定包测试
+go test -v ./pkg/buildtools/...
+
+# 运行集成测试
+go test -v -run "TestScannerIntegration" .
+
+# 运行基准测试
+go test -bench=. -benchmem ./...
+
+# 生成覆盖率报告
+go test -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out -o coverage.html
+```
+
+#### 测试脚本
+
+**Linux/macOS:**
+```bash
+./run-tests.sh
+```
+
+**Windows:**
+```cmd
+run-tests.bat
+```
+
+**高级选项:**
+```bash
+# Linux/macOS - 仅运行单元测试（跳过集成测试）
+./run-tests.sh --unit-only
+
+# Linux/macOS - 启用详细输出
+./run-tests.sh --verbose
+
+# Linux/macOS - 设置自定义覆盖率阈值
+./run-tests.sh --coverage-threshold 80
+
+# Linux/macOS - 跳过测试工件清理
+./run-tests.sh --no-cleanup
+
+# Linux/macOS - 显示帮助
+./run-tests.sh --help
+```
+
+```cmd
+REM Windows - 仅运行单元测试（跳过集成测试）
+run-tests.bat --unit-only
+
+REM Windows - 启用详细输出
+run-tests.bat --verbose
+
+REM Windows - 设置自定义覆盖率阈值
+run-tests.bat --coverage-threshold 80
+
+REM Windows - 跳过测试工件清理
+run-tests.bat --no-cleanup
+
+REM Windows - 显示帮助
+run-tests.bat --help
 ```
 
 ### 构建
@@ -150,7 +229,44 @@ go build -o cleansource-sca-cli main.go
 
 # 带优化的构建
 go build -ldflags="-s -w" -o cleansource-sca-cli main.go
+
+# 交叉编译示例
+GOOS=windows GOARCH=amd64 go build -o cleansource-sca-cli.exe main.go
+GOOS=linux GOARCH=amd64 go build -o cleansource-sca-cli main.go
+GOOS=darwin GOARCH=amd64 go build -o cleansource-sca-cli main.go
 ```
+
+## 扫描器实现
+
+### Go 模块扫描器
+- **检测**: `go.mod` 文件
+- **功能**: 模块名称/版本提取，通过 `go list` 进行依赖分析
+- **依赖**: 需要 Go 1.11+ 和模块支持
+
+### NPM 扫描器
+- **检测**: `package.json` 文件
+- **功能**: 项目信息提取，依赖解析（运行时、开发、对等）
+- **依赖**: 可选的 npm 可执行文件以增强功能
+
+### Gradle 扫描器
+- **检测**: `build.gradle`, `build.gradle.kts` 文件
+- **功能**: 项目信息提取，带作用域检测的依赖解析
+- **依赖**: 可选的 Gradle 可执行文件或包装器
+
+### Pipenv 扫描器
+- **检测**: `Pipfile`, `Pipfile.lock` 文件
+- **功能**: 项目信息提取，通过 `pipenv run pip freeze` 进行依赖解析
+- **依赖**: 需要 pipenv 和 Python 环境
+
+### Maven 扫描器
+- **检测**: `pom.xml` 文件
+- **功能**: POM 解析，依赖树分析
+- **依赖**: 可选的 Maven 可执行文件以增强功能
+
+### Pip 扫描器
+- **检测**: `requirements.txt`, `setup.py`, `pyproject.toml` 文件
+- **功能**: 需求解析，已安装包分析
+- **依赖**: 可选的 pip 可执行文件
 
 ### 添加新的构建工具
 
@@ -162,12 +278,75 @@ go build -ldflags="-s -w" -o cleansource-sca-cli main.go
    - `FileFind()`: 检查所需文件
    - `ScanExecute()`: 执行依赖扫描
 3. 在 `pkg/buildtools/scanner.go` 中添加检测逻辑
-4. 使用示例项目进行测试
+4. 在 `pkg/buildtools/scanners_test.go` 中添加全面测试
+5. 在 `internal/model/types_test.go` 中更新模型测试
+6. 使用示例项目进行测试
+
+## 示例
+
+### 多项目扫描
+
+CLI 可以扫描具有多种构建工具的项目：
+
+```bash
+# 扫描包含 Go 模块和 npm 的项目
+./cleansource-sca-cli --server-url https://your-server.com \
+    --token your-token \
+    --task-dir /path/to/multi-language-project
+```
+
+### 项目结构示例
+
+**Go 项目:**
+```
+project/
+├── go.mod
+├── main.go
+└── go.sum
+```
+
+**Node.js 项目:**
+```
+project/
+├── package.json
+├── package-lock.json
+└── src/
+```
+
+**Gradle 项目:**
+```
+project/
+├── build.gradle
+├── settings.gradle
+└── src/
+```
+
+**Python Pipenv 项目:**
+```
+project/
+├── Pipfile
+├── Pipfile.lock
+└── src/
+```
 
 ## 贡献
 
 1. Fork 仓库
-2. 创建功能分支
+2. 创建功能分支 (`git checkout -b feature/amazing-feature`)
 3. 进行修改
-4. 添加测试
-5. 提交 Pull Request
+4. 为新功能添加全面测试
+5. 确保所有测试通过 (`go test ./...`)
+6. 运行测试脚本 (`./run-tests.sh` 或 `run-tests.bat`)
+7. 如需要更新文档
+8. 提交更改 (`git commit -m 'Add amazing feature'`)
+9. 推送到分支 (`git push origin feature/amazing-feature`)
+10. 打开 Pull Request
+
+### 开发指南
+
+- 遵循 Go 编码标准和最佳实践
+- 为所有新功能添加测试
+- 为新功能更新文档
+- 确保跨平台兼容性
+- 使用有意义的提交消息
+- 保持代码库清洁和文档完善

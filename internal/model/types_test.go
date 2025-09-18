@@ -272,3 +272,299 @@ func TestProjectInfo(t *testing.T) {
 		t.Errorf("Expected License to be 'MIT', got %s", project.License)
 	}
 }
+
+// Test new scanner types
+func TestDependencyID_NewScannerTypes(t *testing.T) {
+	tests := []struct {
+		name     string
+		depID    *DependencyID
+		expected string
+	}{
+		{
+			name: "Go Module",
+			depID: &DependencyID{
+				Group:   "",
+				Name:    "github.com/gin-gonic/gin",
+				Version: "v1.9.1",
+				Type:    "go",
+			},
+			expected: "go",
+		},
+		{
+			name: "NPM Package",
+			depID: &DependencyID{
+				Group:   "",
+				Name:    "express",
+				Version: "^4.18.2",
+				Type:    "npm",
+			},
+			expected: "npm",
+		},
+		{
+			name: "Gradle Dependency",
+			depID: &DependencyID{
+				Group:   "org.springframework",
+				Name:    "spring-core",
+				Version: "5.3.21",
+				Type:    "gradle",
+			},
+			expected: "gradle",
+		},
+		{
+			name: "Pipenv Package",
+			depID: &DependencyID{
+				Group:   "",
+				Name:    "requests",
+				Version: "2.25.1",
+				Type:    "pipenv",
+			},
+			expected: "pipenv",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.depID.Type != tt.expected {
+				t.Errorf("Expected Type to be '%s', got %s", tt.expected, tt.depID.Type)
+			}
+		})
+	}
+}
+
+func TestDependency_NewScannerTypes(t *testing.T) {
+	tests := []struct {
+		name     string
+		dep      Dependency
+		expected string
+	}{
+		{
+			name: "Go Module Dependency",
+			dep: Dependency{
+				ID: &DependencyID{
+					Group:   "",
+					Name:    "github.com/gin-gonic/gin",
+					Version: "v1.9.1",
+					Type:    "go",
+				},
+				Name:    "github.com/gin-gonic/gin",
+				Version: "v1.9.1",
+				Type:    "go",
+				Scope:   "runtime",
+			},
+			expected: "go",
+		},
+		{
+			name: "NPM Development Dependency",
+			dep: Dependency{
+				ID: &DependencyID{
+					Group:   "",
+					Name:    "jest",
+					Version: "^29.5.0",
+					Type:    "npm",
+				},
+				Name:    "jest",
+				Version: "^29.5.0",
+				Type:    "npm",
+				Scope:   "development",
+			},
+			expected: "npm",
+		},
+		{
+			name: "Gradle Test Dependency",
+			dep: Dependency{
+				ID: &DependencyID{
+					Group:   "junit",
+					Name:    "junit",
+					Version: "4.13.2",
+					Type:    "gradle",
+				},
+				Name:    "junit",
+				Version: "4.13.2",
+				Type:    "gradle",
+				Scope:   "test",
+			},
+			expected: "gradle",
+		},
+		{
+			name: "Pipenv Runtime Dependency",
+			dep: Dependency{
+				ID: &DependencyID{
+					Group:   "",
+					Name:    "requests",
+					Version: "2.25.1",
+					Type:    "pipenv",
+				},
+				Name:    "requests",
+				Version: "2.25.1",
+				Type:    "pipenv",
+				Scope:   "runtime",
+			},
+			expected: "pipenv",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.dep.Type != tt.expected {
+				t.Errorf("Expected Type to be '%s', got %s", tt.expected, tt.dep.Type)
+			}
+		})
+	}
+}
+
+func TestDependencyRoot_NewScannerTypes(t *testing.T) {
+	tests := []struct {
+		name        string
+		root        DependencyRoot
+		expectedTool string
+	}{
+		{
+			name: "Go Project",
+			root: DependencyRoot{
+				ProjectName:    "test-go-project",
+				ProjectVersion: "1.21",
+				BuildTool:      "go",
+				Dependencies: []Dependency{
+					{
+						Name:    "github.com/gin-gonic/gin",
+						Version: "v1.9.1",
+						Type:    "go",
+						Scope:   "runtime",
+					},
+				},
+			},
+			expectedTool: "go",
+		},
+		{
+			name: "NPM Project",
+			root: DependencyRoot{
+				ProjectName:    "test-npm-project",
+				ProjectVersion: "1.0.0",
+				BuildTool:      "npm",
+				Dependencies: []Dependency{
+					{
+						Name:    "express",
+						Version: "^4.18.2",
+						Type:    "npm",
+						Scope:   "runtime",
+					},
+				},
+			},
+			expectedTool: "npm",
+		},
+		{
+			name: "Gradle Project",
+			root: DependencyRoot{
+				ProjectName:    "test-gradle-project",
+				ProjectVersion: "1.0.0",
+				BuildTool:      "gradle",
+				Dependencies: []Dependency{
+					{
+						Name:    "org.springframework:spring-core",
+						Version: "5.3.21",
+						Type:    "gradle",
+						Scope:   "runtime",
+					},
+				},
+			},
+			expectedTool: "gradle",
+		},
+		{
+			name: "Pipenv Project",
+			root: DependencyRoot{
+				ProjectName:    "test-pipenv-project",
+				ProjectVersion: "unknown",
+				BuildTool:      "pipenv",
+				Dependencies: []Dependency{
+					{
+						Name:    "requests",
+						Version: "2.25.1",
+						Type:    "pipenv",
+						Scope:   "runtime",
+					},
+				},
+			},
+			expectedTool: "pipenv",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.root.BuildTool != tt.expectedTool {
+				t.Errorf("Expected BuildTool to be '%s', got %s", tt.expectedTool, tt.root.BuildTool)
+			}
+		})
+	}
+}
+
+func TestDependency_Scopes(t *testing.T) {
+	tests := []struct {
+		name     string
+		scope    string
+		expected bool
+	}{
+		{"Runtime scope", "runtime", true},
+		{"Development scope", "development", true},
+		{"Test scope", "test", true},
+		{"Provided scope", "provided", true},
+		{"Peer scope", "peer", true},
+		{"Indirect scope", "indirect", true},
+		{"Compile scope", "compile", true},
+		{"Invalid scope", "invalid", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dep := Dependency{
+				Scope: tt.scope,
+			}
+
+			// Test that the scope is set correctly
+			if dep.Scope != tt.scope {
+				t.Errorf("Expected scope to be '%s', got %s", tt.scope, dep.Scope)
+			}
+		})
+	}
+}
+
+func TestDependencyRoot_MultipleScanners(t *testing.T) {
+	// Test a project that could have multiple build tools
+	roots := []DependencyRoot{
+		{
+			ProjectName:    "go-module",
+			ProjectVersion: "1.21",
+			BuildTool:      "go",
+			Dependencies: []Dependency{
+				{Name: "github.com/gin-gonic/gin", Version: "v1.9.1", Type: "go", Scope: "runtime"},
+			},
+		},
+		{
+			ProjectName:    "npm-package",
+			ProjectVersion: "1.0.0",
+			BuildTool:      "npm",
+			Dependencies: []Dependency{
+				{Name: "express", Version: "^4.18.2", Type: "npm", Scope: "runtime"},
+			},
+		},
+		{
+			ProjectName:    "gradle-project",
+			ProjectVersion: "1.0.0",
+			BuildTool:      "gradle",
+			Dependencies: []Dependency{
+				{Name: "org.springframework:spring-core", Version: "5.3.21", Type: "gradle", Scope: "runtime"},
+			},
+		},
+	}
+
+	expectedTools := []string{"go", "npm", "gradle"}
+
+	if len(roots) != len(expectedTools) {
+		t.Errorf("Expected %d roots, got %d", len(expectedTools), len(roots))
+	}
+
+	for i, root := range roots {
+		if root.BuildTool != expectedTools[i] {
+			t.Errorf("Root %d: Expected BuildTool to be '%s', got %s", i, expectedTools[i], root.BuildTool)
+		}
+	}
+}

@@ -149,16 +149,58 @@ requests`
 		t.Fatalf("Failed to create requirements.txt: %v", err)
 	}
 
-	tools = scanner.DetectBuildTools()
-	foundPip := false
-	for _, tool := range tools {
-		if tool == "pip" {
-			foundPip = true
-		}
+	// Create Go module file
+	goModFile := filepath.Join(tempDir, "go.mod")
+	goModContent := `module test-go-project
+go 1.21`
+	err = os.WriteFile(goModFile, []byte(goModContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create go.mod: %v", err)
 	}
 
-	if !foundPip {
-		t.Error("Should detect pip")
+	// Create NPM package file
+	packageJsonFile := filepath.Join(tempDir, "package.json")
+	packageJsonContent := `{
+	"name": "test-npm-project",
+	"version": "1.0.0"
+}`
+	err = os.WriteFile(packageJsonFile, []byte(packageJsonContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create package.json: %v", err)
+	}
+
+	// Create Pipenv file
+	pipfileFile := filepath.Join(tempDir, "Pipfile")
+	pipfileContent := `[[source]]
+url = "https://pypi.org/simple"
+name = "pypi"
+
+[packages]
+requests = "*"`
+	err = os.WriteFile(pipfileFile, []byte(pipfileContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create Pipfile: %v", err)
+	}
+
+	tools = scanner.DetectBuildTools()
+	expectedTools := []string{"maven", "gradle", "pip", "go", "npm", "pipenv"}
+
+	if len(tools) != len(expectedTools) {
+		t.Errorf("Expected %d build tools, got %d", len(expectedTools), len(tools))
+	}
+
+	// Check that all expected tools are detected
+	for _, expectedTool := range expectedTools {
+		found := false
+		for _, tool := range tools {
+			if tool == expectedTool {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Should detect %s", expectedTool)
+		}
 	}
 }
 
@@ -249,6 +291,227 @@ func TestBuildScanner_ScanDependencies_EmptyProject(t *testing.T) {
 
 	if len(dependencies) != 0 {
 		t.Errorf("Expected no dependencies for empty project, got %d", len(dependencies))
+	}
+}
+
+func TestBuildScanner_ScanDependencies_GoProject(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Create Go project
+	goModFile := filepath.Join(tempDir, "go.mod")
+	goModContent := `module test-go-project
+
+go 1.21
+
+require (
+	github.com/gin-gonic/gin v1.9.1
+	github.com/stretchr/testify v1.8.4
+)`
+	err := os.WriteFile(goModFile, []byte(goModContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create go.mod: %v", err)
+	}
+
+	env := NewScannableEnvironment(tempDir, "")
+	cfg := &config.ScanConfig{}
+	scanner := NewBuildScanner(env, cfg)
+
+	dependencies, err := scanner.ScanDependencies()
+	if err != nil {
+		t.Fatalf("ScanDependencies failed: %v", err)
+	}
+
+	// Should have at least one dependency root (Go project)
+	if len(dependencies) == 0 {
+		t.Error("Expected at least one dependency root for Go project")
+	}
+
+	// Check the Go project
+	var goRoot *model.DependencyRoot
+	for _, dep := range dependencies {
+		if dep.BuildTool == "go" {
+			goRoot = &dep
+			break
+		}
+	}
+
+	if goRoot == nil {
+		t.Error("Expected to find Go dependency root")
+	} else {
+		if goRoot.ProjectName != "test-go-project" {
+			t.Errorf("Expected project name 'test-go-project', got %s", goRoot.ProjectName)
+		}
+		if goRoot.ProjectVersion != "1.21" {
+			t.Errorf("Expected Go version '1.21', got %s", goRoot.ProjectVersion)
+		}
+		// Note: Dependencies from go list command may not be available in test environment
+		t.Logf("Found %d Go dependencies", len(goRoot.Dependencies))
+	}
+}
+
+func TestBuildScanner_ScanDependencies_NpmProject(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Create NPM project
+	packageJsonFile := filepath.Join(tempDir, "package.json")
+	packageJsonContent := `{
+	"name": "test-npm-project",
+	"version": "1.0.0",
+	"dependencies": {
+		"express": "^4.18.2",
+		"lodash": "4.17.21"
+	},
+	"devDependencies": {
+		"jest": "^29.5.0"
+	}
+}`
+	err := os.WriteFile(packageJsonFile, []byte(packageJsonContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create package.json: %v", err)
+	}
+
+	env := NewScannableEnvironment(tempDir, "")
+	cfg := &config.ScanConfig{}
+	scanner := NewBuildScanner(env, cfg)
+
+	dependencies, err := scanner.ScanDependencies()
+	if err != nil {
+		t.Fatalf("ScanDependencies failed: %v", err)
+	}
+
+	// Should have at least one dependency root (NPM project)
+	if len(dependencies) == 0 {
+		t.Error("Expected at least one dependency root for NPM project")
+	}
+
+	// Check the NPM project
+	var npmRoot *model.DependencyRoot
+	for _, dep := range dependencies {
+		if dep.BuildTool == "npm" {
+			npmRoot = &dep
+			break
+		}
+	}
+
+	if npmRoot == nil {
+		t.Error("Expected to find NPM dependency root")
+	} else {
+		if npmRoot.ProjectName != "test-npm-project" {
+			t.Errorf("Expected project name 'test-npm-project', got %s", npmRoot.ProjectName)
+		}
+		if npmRoot.ProjectVersion != "1.0.0" {
+			t.Errorf("Expected project version '1.0.0', got %s", npmRoot.ProjectVersion)
+		}
+		if len(npmRoot.Dependencies) != 3 {
+			t.Errorf("Expected 3 dependencies (2 deps + 1 dev), got %d", len(npmRoot.Dependencies))
+		}
+	}
+}
+
+func TestBuildScanner_ScanDependencies_GradleProject(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Create Gradle project
+	gradleFile := filepath.Join(tempDir, "build.gradle")
+	gradleContent := `plugins {
+    id 'java'
+}
+
+group = 'com.example'
+version = '1.0.0'
+
+dependencies {
+    implementation 'org.springframework:spring-core:5.3.21'
+    testImplementation 'junit:junit:4.13.2'
+}`
+	err := os.WriteFile(gradleFile, []byte(gradleContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create build.gradle: %v", err)
+	}
+
+	env := NewScannableEnvironment(tempDir, "")
+	cfg := &config.ScanConfig{}
+	scanner := NewBuildScanner(env, cfg)
+
+	dependencies, err := scanner.ScanDependencies()
+	if err != nil {
+		t.Fatalf("ScanDependencies failed: %v", err)
+	}
+
+	// Should have at least one dependency root (Gradle project)
+	if len(dependencies) == 0 {
+		t.Error("Expected at least one dependency root for Gradle project")
+	}
+
+	// Check the Gradle project
+	var gradleRoot *model.DependencyRoot
+	for _, dep := range dependencies {
+		if dep.BuildTool == "gradle" {
+			gradleRoot = &dep
+			break
+		}
+	}
+
+	if gradleRoot == nil {
+		t.Error("Expected to find Gradle dependency root")
+	} else {
+		if gradleRoot.ProjectVersion != "1.0.0" {
+			t.Errorf("Expected project version '1.0.0', got %s", gradleRoot.ProjectVersion)
+		}
+		if len(gradleRoot.Dependencies) != 2 {
+			t.Errorf("Expected 2 dependencies, got %d", len(gradleRoot.Dependencies))
+		}
+	}
+}
+
+func TestBuildScanner_ScanDependencies_PipenvProject(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Create Pipenv project
+	pipfileFile := filepath.Join(tempDir, "Pipfile")
+	pipfileContent := `[[source]]
+url = "https://pypi.org/simple"
+name = "pypi"
+
+[packages]
+requests = "*"
+flask = "*"
+
+[dev-packages]
+pytest = "*"`
+	err := os.WriteFile(pipfileFile, []byte(pipfileContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create Pipfile: %v", err)
+	}
+
+	env := NewScannableEnvironment(tempDir, "")
+	cfg := &config.ScanConfig{}
+	scanner := NewBuildScanner(env, cfg)
+
+	dependencies, err := scanner.ScanDependencies()
+	if err != nil {
+		t.Fatalf("ScanDependencies failed: %v", err)
+	}
+
+	// Should have at least one dependency root (Pipenv project)
+	if len(dependencies) == 0 {
+		t.Error("Expected at least one dependency root for Pipenv project")
+	}
+
+	// Check the Pipenv project
+	var pipenvRoot *model.DependencyRoot
+	for _, dep := range dependencies {
+		if dep.BuildTool == "pipenv" {
+			pipenvRoot = &dep
+			break
+		}
+	}
+
+	if pipenvRoot == nil {
+		t.Error("Expected to find Pipenv dependency root")
+	} else {
+		// Note: Dependencies from pipenv run pip freeze may not be available in test environment
+		t.Logf("Found %d Pipenv dependencies", len(pipenvRoot.Dependencies))
 	}
 }
 
